@@ -6,7 +6,7 @@ class Gotify extends NotificationProvider {
     name = "gotify";
 
     async send(notification, msg, monitorJSON = null, heartbeatJSON = null) {
-        let okMsg = "Sent Successfully. ";
+        let okMsg = "Sent Successfully.";
         try {
             if (notification.gotifyserverurl && notification.gotifyserverurl.endsWith("/")) {
                 notification.gotifyserverurl = notification.gotifyserverurl.slice(0, -1);
@@ -15,7 +15,7 @@ class Gotify extends NotificationProvider {
                 "message": msg,
                 "priority": notification.gotifyPriority || 8,
                 "title": "Uptime-Kuma",
-            })
+            });
 
             return okMsg;
 

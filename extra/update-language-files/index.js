@@ -1,78 +1,96 @@
-// Need to use es6 to read language files
+// Need to use ES6 to read language files
 
 import fs from "fs";
-import path from "path";
 import util from "util";
+import rmSync from "../fs-rmSync.js";
 
-// https://stackoverflow.com/questions/13786160/copy-folder-recursively-in-node-js
 /**
- * Look ma, it's cp -R.
- * @param {string} src  The path to the thing to copy.
- * @param {string} dest The path to the new copy.
+ * Copy across the required language files
+ * Creates a local directory (./languages) and copies the required files
+ * into it.
+ * @param {string} langCode Code of language to update. A file will be
+ * created with this code if one does not already exist
+ * @param {string} baseLang The second base language file to copy. This
+ * will be ignored if set to "en" as en.js is copied by default
  */
-const copyRecursiveSync = function (src, dest) {
-    let exists = fs.existsSync(src);
-    let stats = exists && fs.statSync(src);
-    let isDirectory = exists && stats.isDirectory();
-    if (isDirectory) {
-        fs.mkdirSync(dest);
-        fs.readdirSync(src).forEach(function (childItemName) {
-            copyRecursiveSync(path.join(src, childItemName),
-                path.join(dest, childItemName));
-        });
-    } else {
-        fs.copyFileSync(src, dest);
+function copyFiles(langCode, baseLang) {
+    if (fs.existsSync("./languages")) {
+        rmSync("./languages", { recursive: true });
     }
-};
-console.log(process.argv)
-const baseLangCode = process.argv[2] || "zh-HK";
-console.log("Base Lang: " + baseLangCode);
-fs.rmdirSync("./languages", { recursive: true });
-copyRecursiveSync("../../src/languages", "./languages");
+    fs.mkdirSync("./languages");
 
-const en = (await import("./languages/en.js")).default;
-const baseLang = (await import(`./languages/${baseLangCode}.js`)).default;
-const files = fs.readdirSync("./languages");
-console.log(files);
-for (const file of files) {
-    if (file.endsWith(".js")) {
-        console.log("Processing " + file);
-        const lang = await import("./languages/" + file);
+    if (!fs.existsSync(`../../src/languages/${langCode}.js`)) {
+        fs.closeSync(fs.openSync(`./languages/${langCode}.js`, "a"));
+    } else {
+        fs.copyFileSync(`../../src/languages/${langCode}.js`, `./languages/${langCode}.js`);
+    }
+    fs.copyFileSync("../../src/languages/en.js", "./languages/en.js");
+    if (baseLang !== "en") {
+        fs.copyFileSync(`../../src/languages/${baseLang}.js`, `./languages/${baseLang}.js`);
+    }
+}
 
-        let obj;
+/**
+ * Update the specified language file
+ * @param {string} langCode Language code to update
+ * @param {string} baseLang Second language to copy keys from
+ */
+async function updateLanguage(langCode, baseLangCode) {
+    const en = (await import("./languages/en.js")).default;
+    const baseLang = (await import(`./languages/${baseLangCode}.js`)).default;
 
-        if (lang.default) {
-            console.log("is js module");
-            obj = lang.default;
-        } else {
-            console.log("empty file");
-            obj = {
-                languageName: "<Your Language name in your language (not in English)>"
-            };
+    let file = langCode + ".js";
+    console.log("Processing " + file);
+    const lang = await import("./languages/" + file);
+
+    let obj;
+
+    if (lang.default) {
+        obj = lang.default;
+    } else {
+        console.log("Empty file");
+        obj = {
+            languageName: "<Your Language name in your language (not in English)>"
+        };
+    }
+
+    // En first
+    for (const key in en) {
+        if (! obj[key]) {
+            obj[key] = en[key];
         }
+    }
 
-        // En first
-        for (const key in en) {
-            if (! obj[key]) {
-                obj[key] = en[key];
-            }
-        }
-
+    if (baseLang !== en) {
         // Base second
         for (const key in baseLang) {
             if (! obj[key]) {
                 obj[key] = key;
             }
         }
-
-        const code = "export default " + util.inspect(obj, {
-            depth: null,
-        });
-
-        fs.writeFileSync(`../../src/languages/${file}`, code);
-
     }
+
+    const code = "export default " + util.inspect(obj, {
+        depth: null,
+    });
+
+    fs.writeFileSync(`../../src/languages/${file}`, code);
 }
 
-fs.rmdirSync("./languages", { recursive: true });
-console.log("Done, fix the format by eslint now");
+// Get command line arguments
+const baseLangCode = process.env.npm_config_baselang || "en";
+const langCode = process.env.npm_config_language;
+
+// We need the file to edit
+if (langCode == null) {
+    throw new Error("Argument --language=<code> must be provided");
+}
+
+console.log("Base Lang: " + baseLangCode);
+console.log("Updating: " + langCode);
+
+copyFiles(langCode, baseLangCode);
+await updateLanguage(langCode, baseLangCode);
+rmSync("./languages", { recursive: true });
+
+console.log("Done. Fixing formatting by ESLint...");

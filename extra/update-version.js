@@ -1,14 +1,12 @@
 const pkg = require("../package.json");
 const fs = require("fs");
-const child_process = require("child_process");
+const childProcess = require("child_process");
 const util = require("../src/util");
 
 util.polyfill();
 
-const oldVersion = pkg.version;
-const newVersion = process.argv[2];
+const newVersion = process.env.VERSION;
 
-console.log("Old Version: " + oldVersion);
 console.log("New Version: " + newVersion);
 
 if (! newVersion) {
@@ -19,43 +17,61 @@ if (! newVersion) {
 const exists = tagExists(newVersion);
 
 if (! exists) {
+
     // Process package.json
     pkg.version = newVersion;
-    pkg.scripts.setup = pkg.scripts.setup.replaceAll(oldVersion, newVersion);
-    pkg.scripts["build-docker"] = pkg.scripts["build-docker"].replaceAll(oldVersion, newVersion);
-    pkg.scripts["build-docker-alpine"] = pkg.scripts["build-docker-alpine"].replaceAll(oldVersion, newVersion);
-    pkg.scripts["build-docker-debian"] = pkg.scripts["build-docker-debian"].replaceAll(oldVersion, newVersion);
+
+    // Replace the version: https://regex101.com/r/hmj2Bc/1
+    pkg.scripts.setup = pkg.scripts.setup.replace(/(git checkout )([^\s]+)/, `$1${newVersion}`);
     fs.writeFileSync("package.json", JSON.stringify(pkg, null, 4) + "\n");
+
+    // Also update package-lock.json
+    const npm = /^win/.test(process.platform) ? "npm.cmd" : "npm";
+    childProcess.spawnSync(npm, [ "install" ]);
 
     commit(newVersion);
     tag(newVersion);
+
 } else {
-    console.log("version exists")
+    console.log("version exists");
 }
 
+/**
+ * Commit updated files
+ * @param {string} version Version to update to
+ */
 function commit(version) {
-    let msg = "update to " + version;
+    let msg = "Update to " + version;
 
-    let res = child_process.spawnSync("git", ["commit", "-m", msg, "-a"]);
+    let res = childProcess.spawnSync("git", [ "commit", "-m", msg, "-a" ]);
     let stdout = res.stdout.toString().trim();
-    console.log(stdout)
+    console.log(stdout);
 
     if (stdout.includes("no changes added to commit")) {
-        throw new Error("commit error")
+        throw new Error("commit error");
     }
 }
 
+/**
+ * Create a tag with the specified version
+ * @param {string} version Tag to create
+ */
 function tag(version) {
-    let res = child_process.spawnSync("git", ["tag", version]);
-    console.log(res.stdout.toString().trim())
+    let res = childProcess.spawnSync("git", [ "tag", version ]);
+    console.log(res.stdout.toString().trim());
 }
 
+/**
+ * Check if a tag exists for the specified version
+ * @param {string} version Version to check
+ * @returns {boolean} Does the tag already exist
+ */
 function tagExists(version) {
     if (! version) {
         throw new Error("invalid version");
     }
 
-    let res = child_process.spawnSync("git", ["tag", "-l", version]);
+    let res = childProcess.spawnSync("git", [ "tag", "-l", version ]);
 
     return res.stdout.toString().trim() === version;
 }

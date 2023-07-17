@@ -1,9 +1,13 @@
 /.idea
-/dist
 /node_modules
 /data
+/cypress
+/out
+/test
+/kubernetes
 /.do
 **/.dockerignore
+/private
 **/.git
 **/.gitignore
 **/docker-compose*
@@ -15,7 +19,6 @@ README.md
 .eslint*
 .stylelint*
 /.github
-package-lock.json
 yarn.lock
 app.json
 CODE_OF_CONDUCT.md
@@ -24,7 +27,13 @@ CNAME
 install.sh
 SECURITY.md
 tsconfig.json
-
+.env
+/tmp
+/babel.config.js
+/ecosystem.config.js
+/extra/healthcheck.exe
+/extra/healthcheck
+extra/exe-builder
 
 ### .gitignore content (commented rules are duplicated)
 
